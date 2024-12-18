@@ -1,71 +1,77 @@
 import os
 import instaloader
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram import Bot
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
-# توکن بات تلگرام خود را وارد کنید
-TOKEN = "7069449754:AAFXt92cQnWkdSQsmEQUe-gi7fCvZXxfldw"
+# توکن ربات تلگرام خود را اینجا وارد کنید
+TELEGRAM_BOT_TOKEN = '7069449754:AAFXt92cQnWkdSQsmEQUe-gi7fCvZXxfldw'
+# پوشه‌ای که فایل‌ها در آن ذخیره می‌شوند
+DOWNLOAD_FOLDER = './downloads/'
 
-# یک نمونه از instaloader برای دانلود محتویات
+# بررسی وجود پوشه دانلود
+if not os.path.exists(DOWNLOAD_FOLDER):
+    os.makedirs(DOWNLOAD_FOLDER)
+
+# تنظیمات اینستالودر
 L = instaloader.Instaloader()
 
-# پوشه‌ای که فایل‌ها در آن ذخیره می‌شوند
-DOWNLOAD_DIR = './downloads'
-
-# تابعی که پوشه را چک می‌کند و در صورت نیاز آن را می‌سازد
-def ensure_directory_exists(directory_path):
-    if not os.path.exists(directory_path):
-        os.makedirs(directory_path)
-
-# تابعی که URL را دریافت می‌کند و فایل مربوطه را دانلود و ارسال می‌کند
-def download_and_send(update: Update, context: CallbackContext):
-    # دریافت URL از پیام کاربر
-    url = update.message.text
-    
+# تابع دانلود پست اینستاگرام
+def download_instagram_post(url):
     try:
-        # بررسی اینکه URL یک اینستاگرام است یا نه
-        if "instagram.com" in url:
-            # اسلاید کوتاه از URL استخراج می‌شود
-            shortcode = url.split("/")[-2]
-            
-            # مسیر پوشه برای ذخیره فایل‌ها
-            post_dir = os.path.join(DOWNLOAD_DIR, shortcode)
-            
-            # اطمینان از وجود پوشه مربوطه
-            ensure_directory_exists(post_dir)
-            
-            # فایل نهایی که دانلود می‌شود
-            filename = os.path.join(post_dir, f"{shortcode}.jpg")
-            
-            # اگر فایل موجود است، آن را حذف کن
-            if os.path.exists(filename):
-                os.remove(filename)
-                update.message.reply_text(f"فایل قدیمی حذف شد و در حال دانلود مجدد هستیم...")
-
-            # دانلود پست اینستاگرام
-            L.download_post(L.get_post_by_shortcode(shortcode), target=post_dir)
-            
-            # چک کردن اینکه فایل دانلود شده یا نه
-            if os.path.exists(filename):
-                # ارسال فایل به کاربر
-                with open(filename, 'rb') as file:
-                    update.message.reply_photo(photo=file)
-            else:
-                update.message.reply_text("خطا: فایل دانلود نشد.")
-        else:
-            update.message.reply_text("لطفاً یک URL معتبر اینستاگرام ارسال کنید.")
+        # دریافت شناسه پست از URL
+        shortcode = url.split("/")[-2]
+        post = instaloader.Post.from_shortcode(L.context, shortcode)
+        
+        # دانلود پست
+        L.download_post(post, target=DOWNLOAD_FOLDER)
+        return True
     except Exception as e:
-        update.message.reply_text(f"خطا در دانلود فایل: {str(e)}")
+        print(f"Error downloading post: {e}")
+        return False
 
-# تابع اصلی برای راه‌اندازی بات
+# تابع ارسال فایل به تلگرام
+def send_file(chat_id, file_path):
+    try:
+        bot = Bot(token=TELEGRAM_BOT_TOKEN)
+        bot.send_document(chat_id=chat_id, document=open(file_path, 'rb'))
+        print(f"File sent to {chat_id}")
+    except Exception as e:
+        print(f"Error sending file: {e}")
+
+# تابع هندلر پیام تلگرام
+def handle_message(update, context):
+    chat_id = update.message.chat_id
+    message_text = update.message.text
+
+    # بررسی اینکه آیا URL معتبر ارسال شده است
+    if "instagram.com" in message_text:
+        # دانلود پست اینستاگرام
+        if download_instagram_post(message_text):
+            # فایلی که دانلود شده است را ارسال کنید
+            for file_name in os.listdir(DOWNLOAD_FOLDER):
+                if file_name.endswith(".jpg") or file_name.endswith(".mp4"):
+                    file_path = os.path.join(DOWNLOAD_FOLDER, file_name)
+                    send_file(chat_id, file_path)
+                    break
+        else:
+            update.message.reply_text("Error downloading the Instagram post.")
+    else:
+        update.message.reply_text("Please send a valid Instagram post URL.")
+
+# تابع راه‌اندازی ربات
+def start(update, context):
+    update.message.reply_text("Send me an Instagram post URL and I will download and send the file.")
+
 def main():
-    updater = Updater(TOKEN, use_context=True)
+    # راه‌اندازی ربات تلگرام
+    updater = Updater(token=TELEGRAM_BOT_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
 
-    # اضافه کردن دستورات برای مدیریت پیام‌ها
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, download_and_send))
+    # اضافه کردن هندلرهای پیام و شروع
+    dispatcher.add_handler(CommandHandler('start', start))
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
 
-    # شروع بات
+    # شروع کردن polling
     updater.start_polling()
     updater.idle()
 
