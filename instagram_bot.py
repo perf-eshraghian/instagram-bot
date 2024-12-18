@@ -12,9 +12,10 @@ L = instaloader.Instaloader()
 # پوشه‌ای که فایل‌ها در آن ذخیره می‌شوند
 DOWNLOAD_DIR = './downloads'
 
-# بررسی و ساخت پوشه ذخیره‌سازی فایل‌ها
-if not os.path.exists(DOWNLOAD_DIR):
-    os.makedirs(DOWNLOAD_DIR)
+# تابعی که پوشه را چک می‌کند و در صورت نیاز آن را می‌سازد
+def ensure_directory_exists(directory_path):
+    if not os.path.exists(directory_path):
+        os.makedirs(directory_path)
 
 # تابعی که URL را دریافت می‌کند و فایل مربوطه را دانلود و ارسال می‌کند
 def download_and_send(update: Update, context: CallbackContext):
@@ -24,12 +25,20 @@ def download_and_send(update: Update, context: CallbackContext):
     try:
         # بررسی اینکه URL یک اینستاگرام است یا نه
         if "instagram.com" in url:
-            # دانلود پست از اینستاگرام
+            # اسلاید کوتاه از URL استخراج می‌شود
             shortcode = url.split("/")[-2]
-            filename = os.path.join(DOWNLOAD_DIR, f"{shortcode}.jpg")
             
-            # دانلود پست
-            L.download_post(L.get_post_by_shortcode(shortcode), target=DOWNLOAD_DIR)
+            # مسیر پوشه برای ذخیره فایل‌ها
+            post_dir = os.path.join(DOWNLOAD_DIR, shortcode)
+            
+            # اطمینان از وجود پوشه مربوطه
+            ensure_directory_exists(post_dir)
+            
+            # فایل نهایی که دانلود می‌شود
+            filename = os.path.join(post_dir, f"{shortcode}.jpg")
+            
+            # دانلود پست اینستاگرام
+            L.download_post(L.get_post_by_shortcode(shortcode), target=post_dir)
             
             # ارسال فایل به کاربر
             update.message.reply_photo(photo=open(filename, 'rb'))
