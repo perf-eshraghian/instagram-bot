@@ -45,10 +45,15 @@ def download_and_send(update: Update, context: CallbackContext):
             # دانلود پست اینستاگرام
             L.download_post(L.get_post_by_shortcode(shortcode), target=post_dir)
             
-            # ارسال فایل به کاربر
-            update.message.reply_photo(photo=open(filename, 'rb'))
+            # چک کردن اینکه فایل دانلود شده یا نه
+            if os.path.exists(filename):
+                # ارسال فایل به کاربر
+                with open(filename, 'rb') as file:
+                    update.message.reply_photo(photo=file)
+            else:
+                update.message.reply_text("خطا: فایل دانلود نشد.")
         else:
-            update.message.reply_text("لطفاً یک URL معتبر ارسال کنید.")
+            update.message.reply_text("لطفاً یک URL معتبر اینستاگرام ارسال کنید.")
     except Exception as e:
         update.message.reply_text(f"خطا در دانلود فایل: {str(e)}")
 
