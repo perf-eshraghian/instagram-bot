@@ -37,6 +37,11 @@ def download_and_send(update: Update, context: CallbackContext):
             # فایل نهایی که دانلود می‌شود
             filename = os.path.join(post_dir, f"{shortcode}.jpg")
             
+            # اگر فایل موجود است، آن را حذف کن
+            if os.path.exists(filename):
+                os.remove(filename)
+                update.message.reply_text(f"فایل قدیمی حذف شد و در حال دانلود مجدد هستیم...")
+
             # دانلود پست اینستاگرام
             L.download_post(L.get_post_by_shortcode(shortcode), target=post_dir)
             
